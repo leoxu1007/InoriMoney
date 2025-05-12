@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Expense Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .category-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .transaction-type-btn {
+            transition: all 0.2s ease;
+        }
+        .transaction-type-btn.active {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .nested-category {
+            margin-left: 20px;
+            border-left: 2px solid #e5e7eb;
+            padding-left: 10px;
+        }
+        .transaction-type-indicator {
+            width: 6px;
+            height: 100%;
+            position: absolute;
+            left: 0;
+            top: 0;
+            border-radius: 3px 0 0 3px;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        <!-- Header -->
+        <header class="mb-8">
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-3xl font-bold text-indigo-600">
+                    <i class="fas fa-yen-sign mr-2"></i><span id="app-title">Smart Expense Tracker</span>
+                </h1>
+                <div class="flex items-center space-x-4">
+                    <!-- Language Selector -->
+                    <div class="relative">
+                        <select id="language-selector" class="py-1 px-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none text-sm">
+                            <option value="en">English</option>
+                            <option value="ja">日本語</option>
+                        </select>
+                        <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-gray-500">
+                            <i class="fas fa-chevron-down text-xs"></i>
+                        </div>
+                    </div>
+                    <button id="theme-toggle" class="p-2 rounded-full bg-gray-200 dark:bg-gray-700">
+                        <i class="fas fa-moon text-gray-700 dark:text-yellow-300"></i>
+                    </button>
+                    <div class="relative">
+                        <button id="user-menu" class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                            <i class="fas fa-user text-indigo-600"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Monthly Summary -->
+            <div class="bg-white rounded-xl shadow-md p-6 mb-6 fade-in">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-gray-800" id="monthly-summary-title">Monthly Summary</h2>
+                    <div class="flex items-center">
+                        <button id="prev-month" class="p-2 text-gray-500 hover:text-indigo-600">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <span id="current-month" class="mx-2 font-medium">November 2023</span>
+                        <button id="next-month" class="p-2 text-gray-500 hover:text-indigo-600">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="bg-indigo-50 rounded-lg p-4">
+                        <div class="text-gray-500 text-sm" id="total-income-label">Total Income</div>
+                        <div class="text-2xl font-bold text-indigo-600">¥345,000</div>
+                        <div class="text-green-500 text-sm mt-1">
+                            <i class="fas fa-arrow-up mr-1"></i><span id="income-change">8% from last month</span>
+                        </div>
+                    </div>
+                    <div class="bg-red-50 rounded-lg p-4">
+                        <div class="text-gray-500 text-sm" id="total-expenses-label">Total Expenses</div>
+                        <div class="text-2xl font-bold text-red-600">¥187,500</div>
+                        <div class="text-red-500 text-sm mt-1">
+                            <i class="fas fa-arrow-down mr-1"></i><span id="expense-change">3% from last month</span>
+                        </div>
+                    </div>
+                    <div class="bg-green-50 rounded-lg p-4">
+                        <div class="text-gray-500 text-sm" id="balance-label">Balance</div>
+                        <div class="text-2xl font-bold text-green-600">¥157,500</div>
+                        <div class="text-green-500 text-sm mt-1">
+                            <i class="fas fa-piggy-bank mr-1"></i><span id="savings-rate">46% savings rate</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Left Side - Record Addition -->
+                <div class="lg:col-span-1">
+                    <div class="bg-white rounded-xl shadow-md p-6 mb-6 fade-in">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4" id="add-transaction-title">Add Transaction</h2>
+                        
+                        <!-- Transaction Type Selector -->
+                        <div class="grid grid-cols-3 gap-2 mb-4">
+                            <button data-type="expense" class="transaction-type-btn py-2 px-1 bg-red-50 text-red-600 rounded-lg flex flex-col items-center justify-center active">
+                                <i class="fas fa-arrow-up text-sm mb-1"></i>
+                                <span class="text-xs" id="expense-label">Expense</span>
+                            </button>
+                            <button data-type="income" class="transaction-type-btn py-2 px-1 bg-green-50 text-green-600 rounded-lg flex flex-col items-center justify-center">
+                                <i class="fas fa-arrow-down text-sm mb-1"></i>
+                                <span class="text-xs" id="income-label">Income</span>
+                            </button>
+                            <button data-type="transfer" class="transaction-type-btn py-2 px-1 bg-blue-50 text-blue-600 rounded-lg flex flex-col items-center justify-center">
+                                <i class="fas fa-exchange-alt text-sm mb-1"></i>
+                                <span class="text-xs" id="transfer-label">Transfer</span>
+                            </button>
+                            <button data-type="loan" class="transaction-type-btn py-2 px-1 bg-purple-50 text-purple-600 rounded-lg flex flex-col items-center justify-center">
+                                <i class="fas fa-hand-holding-usd text-sm mb-1"></i>
+                                <span class="text-xs" id="loan-label">Loan</span>
+                            </button>
+                            <button data-type="debt" class="transaction-type-btn py-2 px-1 bg-yellow-50 text-yellow-600 rounded-lg flex flex-col items-center justify-center">
+                                <i class="fas fa-hand-holding-heart text-sm mb-1"></i>
+                                <span class="text-xs" id="debt-label">Debt</span>
+                            </button>
+                            <button data-type="repayment" class="transaction-type-btn py-2 px-1 bg-indigo-50 text-indigo-600 rounded-lg flex flex-col items-center justify-center">
+                                <i class="fas fa-handshake text-sm mb-1"></i>
+                                <span class="text-xs" id="repayment-label">Repayment</span>
+                            </button>
+                        </div>
+                        
+                        <!-- Amount Input -->
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-medium mb-2" id="amount-label">Amount (¥)</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">¥</span>
+                                <input type="number" placeholder="0" class="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" step="1" min="0">
+                            </div>
+                        </div>
+                        
+                        <!-- Account Selection -->
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-medium mb-2" id="account-label">Account</label>
+                            <div class="relative">
+                                <select class="w-full py-2 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none">
+                                    <option value="" id="select-account-option">Select Account</option>
+                                    <option value="cash" id="cash-option">Cash</option>
+                                    <option value="bank" id="bank-option">Bank Account</option>
+                                    <option value="credit" id="credit-option">Credit Card</option>
+                                    <option value="paypay" id="paypay-option">PayPay</option>
+                                    <option value="linepay" id="linepay-option">LINE Pay</option>
+                                </select>
+                                <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
+                                    <i class="fas fa-chevron-down"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- For transfers, loans, debts, repayments -->
+                        <div id="secondary-account-container" class="mb-4 hidden">
+                            <label class="block text-gray-700 text-sm font-medium mb-2" id="to-account-label">To Account/Person</label>
+                            <div class="relative">
+                                <select class="w-full py-2 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none">
+                                    <option value="" id="select-to-account-option">Select Account/Person</option>
+                                    <option value="cash" id="to-cash-option">Cash</option>
+                                    <option value="bank" id="to-bank-option">Bank Account</option>
+                                    <option value="credit" id="to-credit-option">Credit Card</option>
+                                    <option value="paypay" id="to-paypay-option">PayPay</option>
+                                    <option value="linepay" id="to-linepay-option">LINE Pay</option>
+                                    <option value="friend1" id="friend1-option">John</option>
+                                    <option value="friend2" id="friend2-option">Sarah</option>
+                                    <option value="family" id="family-option">Family</option>
+                                </select>
+                                <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
+                                    <i class="fas fa-chevron-down"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Category and Subcategory -->
+                        <div id="category-container" class="mb-4">
+                            <label class="block text-gray-700 text-sm font-medium mb-2" id="category-label">Category</label>
+                            <div class="relative mb-2">
+                                <select id="main-category" class="w-full py-2 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none">
+                                    <option value="" id="select-category-option">Select Category</option>
+                                    <option value="food" id="food-option">Food</option>
+                                    <option value="transport" id="transport-option">Transportation</option>
+                                    <option value="living" id="living-option">Living</option>
+                                    <option value="entertainment" id="entertainment-option">Entertainment</option>
+                                    <option value="travel" id="travel-option">Travel</option>
+                                </select>
+                                <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
+                                    <i class="fas fa-chevron-down"></i>
+                                </div>
+                            </div>
+                            <div id="sub-category-container" class="nested-category hidden">
+                                <div class="relative">
+                                    <select id="sub-category" class="w-full py-2 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none">
+                                        <option value="" id="select-subcategory-option">Select Subcategory</option>
+                                    </select>
+                                    <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
+                                        <i class="fas fa-chevron-down"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Project Selection -->
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-medium mb-2" id="project-label">Project</label>
+                            <div class="relative">
+                                <select class="w-full py-2 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none">
+                                    <option value="" id="select-project-option">Select Project</option>
+                                    <option value="daily" id="daily-option">Daily Life</option>
+                                    <option value="work" id="work-option">Work</option>
+                                    <option value="travel" id="travel-project-option">Travel & Tourism</option>
+                                    <option value="hobby" id="hobby-option">Hobby</option>
+                                    <option value="family" id="family-project-option">Family</option>
+                                </select>
+                                <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
+                                    <i class="fas fa-chevron-down"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Time Selection -->
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-gray-700 text-sm font-medium mb-2" id="transaction-date-label">Transaction Date</label>
+                                <input type="datetime-local" class="w-full py-2 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 text-sm font-medium mb-2" id="actual-date-label">Actual Date</label>
+                                <input type="datetime-local" class="w-full py-2 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            </div>
+                        </div>
+                        
+                        <!-- Payee/Payer -->
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-medium mb-2" id="payee-label">Payee/Payer</label>
+                            <input type="text" placeholder="e.g. Yamada Store, JR East" class="w-full py-2 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                        
+                        <!-- Notes -->
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-medium mb-2" id="notes-label">Notes</label>
+                            <textarea rows="2" placeholder="Add details..." class="w-full py-2 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                        </div>
+                        
+                        <!-- Submit Button -->
+                        <button class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition duration-200" id="add-record-btn">
+                            <i class="fas fa-plus mr-2"></i><span id="add-record-text">Add Record</span>
+                        </button>
+                    </div>
+                    
+                    <!-- Quick Records -->
+                    <div class="bg-white rounded-xl shadow-md p-6 fade-in">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4" id="frequent-expenses-title">Frequent Expenses</h2>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button class="py-2 px-3 bg-blue-50 text-blue-700 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-train mr-2"></i><span id="train-expense">Train ¥180</span>
+                            </button>
+                            <button class="py-2 px-3 bg-purple-50 text-purple-700 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-utensils mr-2"></i><span id="lunch-expense">Lunch ¥800</span>
+                            </button>
+                            <button class="py-2 px-3 bg-yellow-50 text-yellow-700 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-plane mr-2"></i><span id="flight-expense">Flight ¥15000</span>
+                            </button>
+                            <button class="py-2 px-3 bg-green-50 text-green-700 rounded-lg flex items-center justify-center">
+                                <i class="fas fa-coffee mr-2"></i><span id="coffee-expense">Coffee ¥350</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Right Side - Record List and Charts -->
+                <div class="lg:col-span-2">
+                    <!-- Record Filter -->
+                    <div class="bg-white rounded-xl shadow-md p-6 mb-6 fade-in">
+                        <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
+                            <h2 class="text-xl font-semibold text-gray-800 mb-2 md:mb-0" id="transaction-history-title">Transaction History</h2>
+                            <div class="flex space-x-2">
+                                <div class="relative">
+                                    <select id="type-filter" class="py-2 pl-3 pr-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none text-sm">
+                                        <option id="all-types-option">All Types</option>
+                                        <option id="expense-filter-option">Expense</option>
+                                        <option id="income-filter-option">Income</option>
+                                        <option id="transfer-filter-option">Transfer</option>
+                                        <option id="loan-filter-option">Loan</option>
+                                        <option id="debt-filter-option">Debt</option>
+                                        <option id="repayment-filter-option">Repayment</option>
+                                    </select>
+                                    <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-gray-500">
+                                        <i class="fas fa-chevron-down text-xs"></i>
+                                    </div>
+                                </div>
+                                <div class="relative">
+                                    <select id="category-filter" class="py-2 pl-3 pr-8 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none text-sm">
+                                        <option id="all-categories-option">All Categories</option>
+                                        <option id="food-filter-option">Food</option>
+                                        <option id="transport-filter-option">Transportation</option>
+                                        <option id="living-filter-option">Living</option>
+                                        <option id="entertainment-filter-option">Entertainment</option>
+                                        <option id="travel-filter-option">Travel</option>
+                                    </select>
+                                    <div class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none text-gray-500">
+                                        <i class="fas fa-chevron-down text-xs"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Record List -->
+                        <div class="space-y-4 max-h-96 overflow-y-auto scrollbar-hide">
+                            <!-- Record Item 1 (Expense) -->
+                            <div class="flex items-center p-3 hover:bg-gray-50 rounded-lg transition relative">
+                                <div class="transaction-type-indicator bg-red-500"></div>
+                                <div class="category-icon bg-red-100 text-red-600 ml-2">
+                                    <i class="fas fa-train"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-medium text-gray-900 truncate">JR East - Commute</p>
+                                    <div class="flex flex-wrap text-xs text-gray-500">
+                                        <span class="mr-2">Nov 15, 08:15</span>
+                                        <span class="mr-2" id="transport-category">Transportation > Train</span>
+                                        <span id="daily-life-project">Daily Life</span>
+                                    </div>
+                                </div>
+                                <div class="ml-4 text-right">
+                                    <p class="text-sm font-semibold text-red-600">-¥180</p>
+                                    <p class="text-xs text-gray-500">Suica</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Record Item 2 (Expense) -->
+                            <div class="flex items-center p-3 hover:bg-gray-50 rounded-lg transition relative">
+                                <div class="transaction-type-indicator bg-red-500"></div>
+                                <div class="category-icon bg-red-100 text-red-600 ml-2">
+                                    <i class="fas fa-utensils"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-medium text-gray-900 truncate">Ramen Shop - Lunch</p>
+                                    <div class="flex flex-wrap text-xs text-gray-500">
+                                        <span class="mr-2">Nov 15, 12:30</span>
+                                        <span class="mr-2" id="food-category">Food > Dining Out</span>
+                                        <span id="daily-life-project2">Daily Life</span>
+                                    </div>
+                                </div>
+                                <div class="ml-4 text-right">
+                                    <p class="text-sm font-semibold text-red-600">-¥850</p>
+                                    <p class="text-xs text-gray-500">Cash</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Record Item 3 (Expense) -->
+                            <div class="flex items-center p-3 hover:bg-gray-50 rounded-lg transition relative">
+                                <div class="transaction-type-indicator bg-red-500"></div>
+                                <div class="category-icon bg-red-100 text-red-600 ml-2">
+                                    <i class="fas fa-plane"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-medium text-gray-900 truncate">ANA - Tokyo to Osaka</p>
+                                    <div class="flex flex-wrap text-xs text-gray-500">
+                                        <span class="mr-2">Nov 18, 09:00</span>
+                                        <span class="mr-2" id="transport-category2">Transportation > Flight</span>
+                                        <span id="travel-project">Travel & Tourism</span>
+                                    </div>
+                                </div>
+                                <div class="ml-4 text-right">
+                                    <p class="text-sm font-semibold text-red-600">-¥15000</p>
+                                    <p class="text-xs text-gray-500">Credit Card</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Record Item 4 (Expense) -->
+                            <div class="flex items-center p-3 hover:bg-gray-50 rounded-lg transition relative">
+                                <div class="transaction-type-indicator bg-red-500"></div>
+                                <div class="category-icon bg-red-100 text-red-600 ml-2">
+                                    <i class="fas fa-train"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-medium text-gray-900 truncate">JR West - Osaka Sightseeing</p>
+                                    <div class="flex flex-wrap text-xs text-gray-500">
+                                        <span class="mr-2">Nov 19, 10:15</span>
+                                        <span class="mr-2" id="transport-category3">Transportation > Train</span>
+                                        <span id="travel-project2">Travel & Tourism</span>
+                                    </div>
+                                </div>
+                                <div class="ml-4 text-right">
+                                    <p class="text-sm font-semibold text-red-600">-¥560</p>
+                                    <p class="text-xs text-gray-500">ICOCA</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Record Item 5 (Income) -->
+                            <div class="flex items-center p-3 hover:bg-gray-50 rounded-lg transition relative">
+                                <div class="transaction-type-indicator bg-green-500"></div>
+                                <div class="category-icon bg-green-100 text-green-600 ml-2">
+                                    <i class="fas fa-money-bill-wave"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-medium text-gray-900 truncate">ABC Corp - Salary</p>
+                                    <div class="flex flex-wrap text-xs text-gray-500">
+                                        <span class="mr-2">Nov 25</span>
+                                        <span class="mr-2" id="income-category">Income > Salary</span>
+                                        <span id="work-project">Work</span>
+                                    </div>
+                                </div>
+                                <div class="ml-4 text-right">
+                                    <p class="text-sm font-semibold text-green-600">+¥300000</p>
+                                    <p class="text-xs text-gray-500">Bank Account</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Record Item 6 (Transfer) -->
+                            <div class="flex items-center p-3 hover:bg-gray-50 rounded-lg transition relative">
+                                <div class="transaction-type-indicator bg-blue-500"></div>
+                                <div class="category-icon bg-blue-100 text-blue-600 ml-2">
+                                    <i class="fas fa-exchange-alt"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-medium text-gray-900 truncate">Transfer to Savings</p>
+                                    <div class="flex flex-wrap text-xs text-gray-500">
+                                        <span class="mr-2">Nov 26, 10:00</span>
+                                        <span class="mr-2" id="transfer-category">Transfer</span>
+                                        <span id="savings-project">Savings</span>
+                                    </div>
+                                </div>
+                                <div class="ml-4 text-right">
+                                    <p class="text-sm font-semibold text-blue-600">-¥50000</p>
+                                    <p class="text-xs text-gray-500">Bank → Savings</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Record Item 7 (Loan) -->
+                            <div class="flex items-center p-3 hover:bg-gray-50 rounded-lg transition relative">
+                                <div class="transaction-type-indicator bg-purple-500"></div>
+                                <div class="category-icon bg-purple-100 text-purple-600 ml-2">
+                                    <i class="fas fa-hand-holding-usd"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-medium text-gray-900 truncate">Loan to John</p>
+                                    <div class="flex flex-wrap text-xs text-gray-500">
+                                        <span class="mr-2">Nov 28, 15:30</span>
+                                        <span class="mr-2" id="loan-category">Loan</span>
+                                        <span id="friends-project">Friends</span>
+                                    </div>
+                                </div>
+                                <div class="ml-4 text-right">
+                                    <p class="text-sm font-semibold text-purple-600">-¥10000</p>
+                                    <p class="text-xs text-gray-500">Cash → John</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Statistics Charts -->
+                    <div class="bg-white rounded-xl shadow-md p-6 fade-in">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4" id="expense-analysis-title">Expense Analysis</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <canvas id="categoryChart" height="200"></canvas>
+                            </div>
+                            <div>
+                                <canvas id="projectChart" height="200"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Language translations
+        const translations = {
+            en: {
+                appTitle: "Smart Expense Tracker",
+                monthlySummaryTitle: "Monthly Summary",
+                totalIncomeLabel: "Total Income",
+                incomeChange: "8% from last month",
+                totalExpensesLabel: "Total Expenses",
+                expenseChange: "3% from last month",
+                balanceLabel: "Balance",
+                savingsRate: "46% savings rate",
+                addTransactionTitle: "Add Transaction",
+                expenseLabel: "Expense",
+                incomeLabel: "Income",
+                transferLabel: "Transfer",
+                loanLabel: "Loan",
+                debtLabel: "Debt",
+                repaymentLabel: "Repayment",
+                amountLabel: "Amount (¥)",
+                accountLabel: "Account",
+                selectAccountOption: "Select Account",
+                cashOption: "Cash",
+                bankOption: "Bank Account",
+                creditOption: "Credit Card",
+                paypayOption: "PayPay",
+                linepayOption: "LINE Pay",
+                toAccountLabel: "To Account/Person",
+                selectToAccountOption: "Select Account/Person",
+                toCashOption: "Cash",
+                toBankOption: "Bank Account",
+                toCreditOption: "Credit Card",
+                toPaypayOption: "PayPay",
+                toLinepayOption: "LINE Pay",
+                friend1Option: "John",
+                friend2Option: "Sarah",
+                familyOption: "Family",
+                categoryLabel: "Category",
+                selectCategoryOption: "Select Category",
+                foodOption: "Food",
+                transportOption: "Transportation",
+                livingOption: "Living",
+                entertainmentOption: "Entertainment",
+                travelOption: "Travel",
+                selectSubcategoryOption: "Select Subcategory",
+                projectLabel: "Project",
+                selectProjectOption: "Select Project",
+                dailyOption: "Daily Life",
+                workOption: "Work",
+                travelProjectOption: "Travel & Tourism",
+                hobbyOption: "Hobby",
+                familyProjectOption: "Family",
+                transactionDateLabel: "Transaction Date",
+                actualDateLabel: "Actual Date",
+                payeeLabel: "Payee/Payer",
+                notesLabel: "Notes",
+                addRecordText: "Add Record",
+                frequentExpensesTitle: "Frequent Expenses",
+                trainExpense: "Train ¥180",
+                lunchExpense: "Lunch ¥800",
+                flightExpense: "Flight ¥15000",
+                coffeeExpense: "Coffee ¥350",
+                transactionHistoryTitle: "Transaction History",
+                allTypesOption: "All Types",
+                expenseFilterOption: "Expense",
+                incomeFilterOption: "Income",
+                transferFilterOption: "Transfer",
+                loanFilterOption: "Loan",
+                debtFilterOption: "Debt",
+                repaymentFilterOption: "Repayment",
+                allCategoriesOption: "All Categories",
+                foodFilterOption: "Food",
+                transportFilterOption: "Transportation",
+                livingFilterOption: "Living",
+                entertainmentFilterOption: "Entertainment",
+                travelFilterOption: "Travel",
+                transportCategory: "Transportation > Train",
+                dailyLifeProject: "Daily Life",
+                foodCategory: "Food > Dining Out",
+                dailyLifeProject2: "Daily Life",
+                transportCategory2: "Transportation > Flight",
+                travelProject: "Travel & Tourism",
+                transportCategory3: "Transportation > Train",
+                travelProject2: "Travel & Tourism",
+                incomeCategory: "Income > Salary",
+                workProject: "Work",
+                transferCategory: "Transfer",
+                savingsProject: "Savings",
+                loanCategory: "Loan",
+                friendsProject: "Friends",
+                expenseAnalysisTitle: "Expense Analysis"
+            },
+            ja: {
+                appTitle: "スマート家計簿",
+                monthlySummaryTitle: "月間サマリー",
+                totalIncomeLabel: "総収入",
+                incomeChange: "先月比8%増",
+                totalExpensesLabel: "総支出",
+                expenseChange: "先月比3%減",
+                balanceLabel: "残高",
+                savingsRate: "貯蓄率46%",
+                addTransactionTitle: "取引を追加",
+                expenseLabel: "支出",
+                incomeLabel: "収入",
+                transferLabel: "振替",
+                loanLabel: "貸付",
+                debtLabel: "借入",
+                repaymentLabel: "返済",
+                amountLabel: "金額 (¥)",
+                accountLabel: "口座",
+                selectAccountOption: "口座を選択",
+                cashOption: "現金",
+                bankOption: "銀行口座",
+                creditOption: "クレジットカード",
+                paypayOption: "PayPay",
+                linepayOption: "LINE Pay",
+                toAccountLabel: "相手先口座/人物",
+                selectToAccountOption: "相手先を選択",
+                toCashOption: "現金",
+                toBankOption: "銀行口座",
+                toCreditOption: "クレジットカード",
+                toPaypayOption: "PayPay",
+                toLinepayOption: "LINE Pay",
+                friend1Option: "ジョン",
+                friend2Option: "サラ",
+                familyOption: "家族",
+                categoryLabel: "カテゴリ",
+                selectCategoryOption: "カテゴリを選択",
+                foodOption: "食費",
+                transportOption: "交通費",
+                livingOption: "生活費",
+                entertainmentOption: "娯楽",
+                travelOption: "旅行",
+                selectSubcategoryOption: "サブカテゴリを選択",
+                projectLabel: "プロジェクト",
+                selectProjectOption: "プロジェクトを選択",
+                dailyOption: "日常生活",
+                workOption: "仕事",
+                travelProjectOption: "旅行・観光",
+                hobbyOption: "趣味",
+                familyProjectOption: "家族",
+                transactionDateLabel: "取引日",
+                actualDateLabel: "実際の日付",
+                payeeLabel: "支払先/支払者",
+                notesLabel: "メモ",
+                addRecordText: "記録を追加",
+                frequentExpensesTitle: "頻繁な支出",
+                trainExpense: "電車 ¥180",
+                lunchExpense: "昼食 ¥800",
+                flightExpense: "飛行機 ¥15000",
+                coffeeExpense: "コーヒー ¥350",
+                transactionHistoryTitle: "取引履歴",
+                allTypesOption: "すべての種類",
+                expenseFilterOption: "支出",
+                incomeFilterOption: "収入",
+                transferFilterOption: "振替",
+                loanFilterOption: "貸付",
+                debtFilterOption: "借入",
+                repaymentFilterOption: "返済",
+                allCategoriesOption: "すべてのカテゴリ",
+                foodFilterOption: "食費",
+                transportFilterOption: "交通費",
+                livingFilterOption: "生活費",
+                entertainmentFilterOption: "娯楽",
+                travelFilterOption: "旅行",
+                transportCategory: "交通費 > 電車",
+                dailyLifeProject: "日常生活",
+                foodCategory: "食費 > 外食",
+                dailyLifeProject2: "日常生活",
+                transportCategory2: "交通費 > 飛行機",
+                travelProject: "旅行・観光",
+                transportCategory3: "交通費 > 電車",
+                travelProject2: "旅行・観光",
+                incomeCategory: "収入 > 給与",
+                workProject: "仕事",
+                transferCategory: "振替",
+                savingsProject: "貯蓄",
+                loanCategory: "貸付",
+                friendsProject: "友人",
+                expenseAnalysisTitle: "支出分析"
+            }
+        };
+
+        // Category data
+        const categories = {
+            food: {
+                name: "Food",
+                subcategories: ["Groceries", "Dining Out", "Beverages", "Snacks"]
+            },
+            transport: {
+                name: "Transportation",
+                subcategories: ["Train", "Bus", "Taxi", "Flight", "Gasoline"]
+            },
+            living: {
+                name: "Living",
+                subcategories: ["Rent", "Utilities", "Communication", "Daily Necessities"]
+            },
+            entertainment: {
+                name: "Entertainment",
+                subcategories: ["Movies", "Music", "Sports", "Games"]
+            },
+            travel: {
+                name: "Travel",
+                subcategories: ["Accommodation", "Sightseeing", "Souvenirs", "Rental Car"]
+            }
+        };
+
+        // Initialize charts and language
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set initial language
+            let currentLanguage = 'en';
+            
+            // Language selector functionality
+            const languageSelector = document.getElementById('language-selector');
+            languageSelector.addEventListener('change', function() {
+                currentLanguage = this.value;
+                updateLanguage(currentLanguage);
+            });
+            
+            // Function to update all text elements to selected language
+            function updateLanguage(lang) {
+                const langData = translations[lang];
+                for (const [key, value] of Object.entries(langData)) {
+                    const element = document.getElementById(key);
+                    if (element) {
+                        if (element.tagName === 'INPUT' || element.tagName === 'OPTION') {
+                            element.textContent = value;
+                        } else {
+                            element.textContent = value;
+                        }
+                    }
+                }
+                
+                // Update month display with correct language
+                updateMonthDisplay(lang);
+            }
+            
+            // Category Pie Chart
+            const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+            const categoryChart = new Chart(categoryCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Food', 'Transportation', 'Living', 'Entertainment', 'Travel'],
+                    datasets: [{
+                        data: [45000, 32000, 55000, 18000, 37500],
+                        backgroundColor: [
+                            '#3B82F6',
+                            '#8B5CF6',
+                            '#10B981',
+                            '#F59E0B',
+                            '#EF4444'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `${label}: ¥${value.toLocaleString()} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '70%'
+                }
+            });
+            
+            // Project Bar Chart
+            const projectCtx = document.getElementById('projectChart').getContext('2d');
+            const projectChart = new Chart(projectCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Daily Life', 'Work', 'Travel & Tourism', 'Hobby', 'Family'],
+                    datasets: [{
+                        label: 'Expenses (¥)',
+                        data: [65000, 12000, 67500, 15000, 18000],
+                        backgroundColor: '#6366F1',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '¥' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Theme toggle
+            const themeToggle = document.getElementById('theme-toggle');
+            themeToggle.addEventListener('click', function() {
+                document.documentElement.classList.toggle('dark');
+                const icon = this.querySelector('i');
+                if (document.documentElement.classList.contains('dark')) {
+                    icon.classList.remove('fa-moon');
+                    icon.classList.add('fa-sun');
+                } else {
+                    icon.classList.remove('fa-sun');
+                    icon.classList.add('fa-moon');
+                }
+            });
+            
+            // Month navigation
+            const currentMonthEl = document.getElementById('current-month');
+            const prevMonthBtn = document.getElementById('prev-month');
+            const nextMonthBtn = document.getElementById('next-month');
+            
+            let currentDate = new Date();
+            
+            function updateMonthDisplay(lang = 'en') {
+                const options = { 
+                    year: 'numeric', 
+                    month: 'long',
+                    locale: lang === 'ja' ? 'ja-JP' : 'en-US'
+                };
+                
+                if (lang === 'ja') {
+                    // For Japanese format: YYYY年 M月
+                    const year = currentDate.getFullYear();
+                    const month = currentDate.getMonth() + 1;
+                    currentMonthEl.textContent = `${year}年 ${month}月`;
+                } else {
+                    // For English format: Month YYYY
+                    currentMonthEl.textContent = currentDate.toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'long' 
+                    });
+                }
+            }
+            
+            prevMonthBtn.addEventListener('click', function() {
+                currentDate.setMonth(currentDate.getMonth() - 1);
+                updateMonthDisplay(currentLanguage);
+                // Add logic to load month data here
+            });
+            
+            nextMonthBtn.addEventListener('click', function() {
+                currentDate.setMonth(currentDate.getMonth() + 1);
+                updateMonthDisplay(currentLanguage);
+                // Add logic to load month data here
+            });
+            
+            updateMonthDisplay();
+            
+            // Category selection
+            const mainCategorySelect = document.getElementById('main-category');
+            const subCategoryContainer = document.getElementById('sub-category-container');
+            const subCategorySelect = document.getElementById('sub-category');
+            
+            mainCategorySelect.addEventListener('change', function() {
+                const selectedCategory = this.value;
+                
+                // Clear subcategories
+                subCategorySelect.innerHTML = '<option value="" id="select-subcategory-option">Select Subcategory</option>';
+                
+                if (selectedCategory && categories[selectedCategory]) {
+                    // Add subcategories
+                    categories[selectedCategory].subcategories.forEach(sub => {
+                        const option = document.createElement('option');
+                        option.value = sub;
+                        option.textContent = sub;
+                        subCategorySelect.appendChild(option);
+                    });
+                    
+                    // Show subcategory
+                    subCategoryContainer.classList.remove('hidden');
+                } else {
+                    // Hide subcategory
+                    subCategoryContainer.classList.add('hidden');
+                }
+            });
+            
+            // Transaction type selection
+            const transactionTypeBtns = document.querySelectorAll('.transaction-type-btn');
+            const categoryContainer = document.getElementById('category-container');
+            const secondaryAccountContainer = document.getElementById('secondary-account-container');
+            
+            transactionTypeBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    // Remove active class from all buttons
+                    transactionTypeBtns.forEach(b => b.classList.remove('active'));
+                    
+                    // Add active class to clicked button
+                    this.classList.add('active');
+                    
+                    const type = this.dataset.type;
+                    
+                    // Show/hide appropriate fields
+                    if (type === 'expense' || type === 'income') {
+                        categoryContainer.classList.remove('hidden');
+                        secondaryAccountContainer.classList.add('hidden');
+                    } else {
+                        categoryContainer.classList.add('hidden');
+                        secondaryAccountContainer.classList.remove('hidden');
+                    }
+                });
+            });
+            
+            // Quick record buttons
+            document.querySelectorAll('.bg-white.rounded-xl.shadow-md.p-6.fade-in button').forEach(button => {
+                button.addEventListener('click', function() {
+                    const amountText = this.textContent.match(/¥(\d+)/);
+                    if (amountText) {
+                        const amount = amountText[1];
+                        document.querySelector('input[type="number"]').value = amount;
+                    }
+                    
+                    // Set category (simplified)
+                    const iconClass = this.querySelector('i').className;
+                    if (iconClass.includes('fa-train')) {
+                        mainCategorySelect.value = 'transport';
+                        mainCategorySelect.dispatchEvent(new Event('change'));
+                        subCategorySelect.value = 'Train';
+                    } else if (iconClass.includes('fa-utensils')) {
+                        mainCategorySelect.value = 'food';
+                        mainCategorySelect.dispatchEvent(new Event('change'));
+                        subCategorySelect.value = 'Dining Out';
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
